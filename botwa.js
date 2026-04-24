@@ -73,6 +73,7 @@ function getSavedSessions() {
 async function startBot(phoneNumber) {
     const sessionPath = `./sessions/session_${phoneNumber}`;
     const USERS_FILE = `./users_${phoneNumber}.json`;
+    const CONTACT_FILE = `./contacts_${phoneNumber}.json`;
     function loadUsers() {
         if (fs.existsSync(USERS_FILE)) {
             const data = JSON.parse(fs.readFileSync(USERS_FILE));
@@ -84,6 +85,16 @@ async function startBot(phoneNumber) {
     function saveUsers(users) {
         fs.writeFileSync(USERS_FILE, JSON.stringify([...users]));
     }
+    function loadContacts() {
+        if (fs.existsSync(CONTACT_FILE)) {
+            return new Set(JSON.parse(fs.readFileSync(CONTACT_FILE)));
+        }
+        return new Set();
+    }
+    function saveContacts(data) {
+        fs.writeFileSync(CONTACT_FILE, JSON.stringify([...data]));
+    }
+    let savedContacts = loadContacts();
     const getRecentUsers = () => {
         return Array.from(recentUsers);
     };
@@ -173,6 +184,7 @@ async function startBot(phoneNumber) {
         
         if (!savedContacts.has(number)) {
             savedContacts.add(number);
+            saveContacts(savedContacts);
         }
         
         const number = participant.split('@')[0];
