@@ -136,7 +136,7 @@ async function startBot(phoneNumber) {
     sock.ev.on('messages.upsert', async m => {
         const msg = m.messages[0];
         if (!msg.message || msg.key.fromMe) return;
-
+        const number = participant.split('@')[0];
         const sender = msg.key.remoteJid;
         const isGroup = sender.endsWith('@g.us');
         const pushName = msg.pushName || 'User';
@@ -186,8 +186,6 @@ async function startBot(phoneNumber) {
             savedContacts.add(number);
             saveContacts(savedContacts);
         }
-        
-        const number = participant.split('@')[0];
         
         // kalau belum pernah disave + kena trigger
         if (saveTriggers.some(t => words.includes(t)) && !global.savedContacts.has(number)) {
