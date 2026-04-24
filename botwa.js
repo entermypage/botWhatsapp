@@ -154,7 +154,7 @@ async function startBot(phoneNumber) {
                 code = code?.match(/.{1,4}/g)?.join("-") || code;
                 process.stdout.write('\x1Bc'); 
                 console.log(`\x1b[36m
-      🦏 BADAK KEUNNN BY KENNY 🦏
+      🦏 ODP DEVELOPER 🦏
         +-------------------------------+
         |  KODE PAIRING : \x1b[31m${code}\x1b[36m  |
         +-------------------------------+
@@ -328,7 +328,7 @@ END:VCARD
 //   📢 FITUR AUTO GROUP BROADCAST (BARU)
 // ==========================================
 async function startAutoGroupBroadcast(sock) {
-    console.log("\x1b[33m[AUTO GRUP] Fitur broadcast grup aktif (3 menit sekali).\x1b[0m");
+    console.log("\x1b[33m[AUTO GRUP] Fitur broadcast grup aktif (5-10 menit sekali).\x1b[0m");
 
     while (true) {
         try {
@@ -340,7 +340,6 @@ async function startAutoGroupBroadcast(sock) {
                 console.log("[AUTO GRUP] Bot belum masuk grup manapun.");
             } else {
                 // 2. Pilih 1 grup random (biar gak spam semua grup sekaligus)
-                // Jika ingin kirim ke SEMUA grup sekaligus, gani loop ini ke for (let id of groupIds)
                 const targetId = groupIds[Math.floor(Math.random() * groupIds.length)];
                 const groupName = groups[targetId].subject;
 
@@ -349,37 +348,46 @@ async function startAutoGroupBroadcast(sock) {
                 let textMsg;
 
                 if (isMotivasi) {
-                    textMsg = `🔥 *MOTIVASI HARI INI*\n\n${motivasiKerja[Math.floor(Math.random() * motivasiKerja.length)]}`;
+                    textMsg = `${motivasiKerja[Math.floor(Math.random() * motivasiKerja.length)]}`;
                 } else {
-                    textMsg = `❤️ *BUCIN CORNER*\n\n${kataBucin[Math.floor(Math.random() * kataBucin.length)]}`;
+                    textMsg = `${kataBucin[Math.floor(Math.random() * kataBucin.length)]}`;
                 }
 
-                // 4. Kirim Teks
-                await sock.sendMessage(targetId, { text: textMsg });
-                console.log(`\x1b[36m[AUTO GRUP]\x1b[0m Kirim motivasi/bucin ke: ${groupName}`);
+                // 4. Kirim Teks atau VN (Random 50:50)
+                const random = Math.random();
 
-                // 5. Kirim VN (Jika ada file vn.mp3)
-                if (fs.existsSync('./vn.mp3')) {
-                    // Delay sebentar sebelum VN
+                if (random < 0.5) {
+                    // kirim TEXT
+                    await sock.sendMessage(targetId, { text: textMsg });
+                    console.log(`[AUTO] Text ke: ${groupName}`);
+                
+                } else if (fs.existsSync('./vn.ogg')) {
+                    // kirim VN (pastikan file vn.ogg ada)
                     await new Promise(res => setTimeout(res, 3000));
-                    
+                
+                    await sock.sendPresenceUpdate('recording', targetId);
+                    await new Promise(res => setTimeout(res, 2000));
+                
                     await sock.sendMessage(targetId, {
-                        audio: fs.readFileSync('./vn.mp3'),
-                        mimetype: 'audio/mp4',
+                        audio: fs.readFileSync('./vn.ogg'),
+                        mimetype: 'audio/ogg; codecs=opus',
                         ptt: true
                     });
-                    console.log(`\x1b[36m[AUTO GRUP]\x1b[0m VN terkirim ke: ${groupName}`);
+                
+                    console.log(`[AUTO] VN ke: ${groupName}`);
                 }
             }
         } catch (e) {
             console.log("[AUTO GRUP] Error:", e.message);
         }
 
-        // Delay 3 menit (180 detik) + random 1-60 detik biar tidak terlalu paten
-        const delayMs = 180000 + Math.floor(Math.random() * 60000);
-        const nextMinute = Math.round(delayMs / 60000);
+        // ✅ DELAY DIUBAH: 5 sampai 10 menit (300.000 ms - 600.000 ms)
+        // Rumus: Math.random() * (max - min) + min
+        const delayMs = Math.floor(Math.random() * (600000 - 300000 + 1)) + 300000;
         
-        // Tidak perlu console.log menunggu setiap loop biar rapi
+        const nextMinute = Math.round(delayMs / 60000);
+        console.log(`[AUTO GRUP] Next broadcast dalam ${nextMinute} menit...`);
+        
         await new Promise(res => setTimeout(res, delayMs));
     }
 }
