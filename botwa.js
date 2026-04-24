@@ -290,7 +290,7 @@ async function startBot(phoneNumber) {
     
             if (!autoPCRunning) {
                 autoPCRunning = true;
-                startAutoPC(sock);
+                startAutoPC(sock, recentUsers);
             }
         }
     
@@ -344,11 +344,11 @@ async function sendPC(sock, jid) {
         console.log(`Error PC ke ${jid}:`, e.message);
     }
 }
-async function startAutoPC(sock) {
+async function startAutoPC(sock, recentUsers) {
     console.log("[AUTO PC] Jalan...");
 
     while (true) {
-        const users = getRecentUsers();
+        const users = Array.from(recentUsers);
 
         if (users.length === 0) {
             console.log("Tidak ada target");
