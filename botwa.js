@@ -30,7 +30,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
 // --- HELPERS ---
-const { makeInMemoryStore } = require('@whiskeysockets/baileys');
+const { makeInMemoryStore } = require('@whiskeysockets/baileys/lib/Store');
 const store = makeInMemoryStore({
     logger: pino({ level: 'silent' })
 });
