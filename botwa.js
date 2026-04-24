@@ -29,11 +29,6 @@ process.stdout.write = function(chunk) {
 const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
-// --- HELPERS ---
-const { makeInMemoryStore } = require('@whiskeysockets/baileys/lib/Store');
-const store = makeInMemoryStore({
-    logger: pino({ level: 'silent' })
-});
 const isLateNight = () => {
     const hour = new Date().getHours();
     return (hour >= 23 || hour <= 5); 
@@ -54,13 +49,6 @@ const getRandomCall = () => {
     }
 
     return call;
-};
-
-const getRecentUsers = () => {
-    const chats = Object.values(store.chats);
-    return chats
-        .filter(c => c.id.endsWith('@s.whatsapp.net'))
-        .map(c => c.id);
 };
 
 const getChatWord = () => {
@@ -84,6 +72,22 @@ function getSavedSessions() {
 
 async function startBot(phoneNumber) {
     const sessionPath = `./sessions/session_${phoneNumber}`;
+    const USERS_FILE = `./users_${phoneNumber}.json`;
+    function loadUsers() {
+        if (fs.existsSync(USERS_FILE)) {
+            const data = JSON.parse(fs.readFileSync(USERS_FILE));
+            return new Set(data);
+        }
+        return new Set();
+    }
+    
+    function saveUsers(users) {
+        fs.writeFileSync(USERS_FILE, JSON.stringify([...users]));
+    }
+    const getRecentUsers = () => {
+        return Array.from(recentUsers);
+    };
+    let recentUsers = loadUsers();
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const { version } = await fetchLatestBaileysVersion();
 
@@ -167,7 +171,9 @@ async function startBot(phoneNumber) {
         const saveTriggers = ["halo", "save", "sve", "farming", "p", "bang", "bg"];
         const words = textMessage.split(/\s+/);
         
-        if (!global.savedContacts) global.savedContacts = new Set();
+        if (!savedContacts.has(number)) {
+            savedContacts.add(number);
+        }
         
         const number = participant.split('@')[0];
         
@@ -217,6 +223,7 @@ async function startBot(phoneNumber) {
         if (!isGroup) {
         
             if (!global.pcCooldown) global.pcCooldown = {};
+            if (sender.includes(phoneNumber)) return;
             const now = Date.now();
             if (global.pcCooldown[sender] && now - global.pcCooldown[sender] < 300000) return;
             global.pcCooldown[sender] = now;
