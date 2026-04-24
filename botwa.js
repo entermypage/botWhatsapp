@@ -37,25 +37,13 @@ const motivasiKerja = [
     "Jangan tunggu kesempatan. Ciptakan kesempatan.",
     "Kerja keras mengalahkan bakat ketika bakat tidak bekerja keras.",
     "Jika kamu tidak sanggup menahan lelahnya belajar, maka kamu harus sanggup menahan perihnya kebodohan.",
-    "Mimpi tidak akan bekerja kecuali kamu bekerja.",
-    "Jangan biarkan kemarin mengambil terlalu banyak waktu hari ini.",
-    "Sukses biasanya datang kepada mereka yang terlalu sibuk mencarinya.",
-    "Perjalanan seribu mil dimulai dengan satu langkah.",
-    "Jangan takut gagal, takutlah untuk tidak mencoba.",
-    "Waktu terbaik untuk menanam pohon adalah 20 tahun yang lalu. Waktu terbaik kedua adalah sekarang."
+    "Mimpi tidak akan bekerja kecuali kamu bekerja."
 ];
 
 const kataBucin = [
     "Aku bukan ingin memilikimu, aku hanya ingin mencintaimu tanpa memiliki.",
     "Cintamu bagaikan mentari yang selalu tersenyum padaku setiap pagi.",
-    "Jika kamu adalah buku, aku akan membacamu berulang-ulang tanpa bosan.",
-    "Sejak aku mengenalmu, waktu terasa begitu cepat berlalu karena bahagia.",
-    "Kamu adalah alasan kenapa aku percaya pada takdir.",
-    "Aku rela menunggu selamanya, asal akhirnya kamu.",
-    "Kalau kamu jadi matahari, aku rela jadi planet yang mengorbitmu.",
-    "Tidak ada kata lelah untuk orang yang dicintai.",
-    "Cinta bukan tentang memiliki, tapi tentang memberi kebahagiaan.",
-    "Setiap detik tanpamu terasa seperti setahun."
+    "Jika kamu adalah buku, aku akan membacamu berulang-ulang tanpa bosan."
 ];
 
 // ==========================================
@@ -70,9 +58,7 @@ const getRandomCall = () => {
     const calls = ["om", "kak", "bang", "bestie", "mas", "boss"];
     if (Math.random() < 0.4) return "";
     let call = calls[Math.floor(Math.random() * calls.length)];
-    if (Math.random() < 0.2) {
-        call = call.replace("a", "aa"); 
-    }
+    if (Math.random() < 0.2) call = call.replace("a", "aa"); 
     return call;
 };
 
@@ -94,31 +80,23 @@ function getSavedSessions() {
 // ==========================================
 async function startBot(phoneNumber) {
     const sessionPath = `./sessions/session_${phoneNumber}`;
-    const USERS_FILE = `./users_${phoneNumber}.json`;
-    const CONTACT_FILE = `./contacts_${phoneNumber}.json`;
+    // Ganti nama file biar fresh (biar ga bentrok sama file lama)
+    const USERS_FILE = `./db_users_${phoneNumber}.json`;
+    const CONTACT_FILE = `./db_contacts_${phoneNumber}.json`;
     
     function loadUsers() {
-        if (fs.existsSync(USERS_FILE)) {
-            const data = JSON.parse(fs.readFileSync(USERS_FILE));
-            return new Set(data);
-        }
+        if (fs.existsSync(USERS_FILE)) return new Set(JSON.parse(fs.readFileSync(USERS_FILE)));
         return new Set();
     }
     
-    function saveUsers(users) {
-        fs.writeFileSync(USERS_FILE, JSON.stringify([...users]));
-    }
+    function saveUsers(users) { fs.writeFileSync(USERS_FILE, JSON.stringify([...users])); }
     
     function loadContacts() {
-        if (fs.existsSync(CONTACT_FILE)) {
-            return new Set(JSON.parse(fs.readFileSync(CONTACT_FILE)));
-        }
+        if (fs.existsSync(CONTACT_FILE)) return new Set(JSON.parse(fs.readFileSync(CONTACT_FILE)));
         return new Set();
     }
     
-    function saveContacts(data) {
-        fs.writeFileSync(CONTACT_FILE, JSON.stringify([...data]));
-    }
+    function saveContacts(data) { fs.writeFileSync(CONTACT_FILE, JSON.stringify([...data])); }
 
     let savedContacts = loadContacts();
     let recentUsers = loadUsers();
@@ -172,13 +150,10 @@ async function startBot(phoneNumber) {
             msg.message.extendedTextMessage?.text || ""
         ).toLowerCase();
         
-        // Update recentUsers (untuk Auto PC)
-        if (!isGroup) {
-            if (!recentUsers.has(sender)) {
-                recentUsers.add(sender);
-                saveUsers(recentUsers);
-                console.log(`[DB] ${pushName} ditambahkan ke target Auto PC.`);
-            }
+        // Update recentUsers
+        if (!isGroup && !recentUsers.has(sender)) {
+            recentUsers.add(sender);
+            saveUsers(recentUsers);
         }
 
         const time = new Date().toLocaleTimeString();
@@ -187,7 +162,7 @@ async function startBot(phoneNumber) {
         console.log(`\x1b[37mMsg:\x1b[0m ${textMessage}`);
         
         // --- 1. AUTO REPLY GRUP (TRIGGER) ---
-        const groupTriggers = ["farming", "chat", "save", "sv", "sve", "cht", "warming", " p "];
+        const groupTriggers = ["farming", "chat", "save", "sv", "sve", "cht"];
         
         if (isGroup && groupTriggers.some(t => textMessage.includes(t))) {
             const now = Date.now();
@@ -208,20 +183,26 @@ async function startBot(phoneNumber) {
         }
 
         // --- 2. AUTO SAVE + AUTO REPLY (USER BARU) ---
-        // Trigger words
-        const saveTriggers = ["halo", "save", "sve", "farming", "p", "bang", "bg", "info"];
+        const saveTriggers = ["halo", "save", "sve", "farming", "p", "bang", "bg"];
         const words = textMessage.split(/\s+/);
+
+        // Cek apakah ada kata trigger
+        const hasTrigger = saveTriggers.some(t => words.includes(t));
         
-        // ✅ PERBAIKAN LOGICA:
-        // Cek dulu apakah user baru DAN mengandung trigger.
-        // Jika iya, baru lakukan aksi dan tandai sudah disave.
-        if (saveTriggers.some(t => words.includes(t)) && !savedContacts.has(number)) {
-            
-            // 1. Tandai sudah disave agar tidak diulang
+        // Cek apakah sudah pernah disave
+        const isAlreadySaved = savedContacts.has(number);
+
+        // DEBUG LOG (biar kita tau kenapa ga jalan)
+        console.log(`\x1b[33m[DEBUG]\x1b[0m Trigger: ${hasTrigger} | Saved: ${isAlreadySaved} | Number: ${number}`);
+
+        if (hasTrigger && !isAlreadySaved) {
+            console.log(`\x1b[36m[EXECUTE]\x1b[0m Memproses save & reply untuk ${pushName}...`);
+
+            // 1. Tandai dulu biar ga dobel
             savedContacts.add(number);
             saveContacts(savedContacts);
 
-            // 2. Proses save dan reply
+            // 2. Delay biar natural
             setTimeout(async () => {
                 const call = getRandomCall();
                 const vcf = `BEGIN:VCARD
@@ -231,7 +212,7 @@ TEL;TYPE=CELL:${number}
 END:VCARD
 `;
                 fs.appendFileSync('./database_kontak.vcf', vcf);
-                console.log(`\x1b[36m[SAVE]\x1b[0m 🦏 ${pushName} (${number})`);
+                console.log(`\x1b[36m[SUCCESS]\x1b[0m VCF Saved: ${pushName} (${number})`);
         
                 if (!isGroup) {
                     const replies = [
@@ -243,9 +224,11 @@ END:VCARD
                     await sock.sendPresenceUpdate('composing', sender);
                     await new Promise(res => setTimeout(res, 2000));
                     await sock.sendMessage(sender, { text: reply });
-                    console.log(`\x1b[32m[REPLY]\x1b[0m 🦏 Auto respon user baru`);
+                    console.log(`\x1b[32m[SUCCESS]\x1b[0m Auto reply terkirim!`);
                 }
             }, Math.floor(Math.random() * 3000) + 2000);
+        } else if (hasTrigger && isAlreadySaved) {
+            console.log(`\x1b[31m[SKIP]\x1b[0m User sudah ada di database, tidak balas.`);
         }
 
         // --- 3. AUTO REPLY PC ---
@@ -326,9 +309,7 @@ async function startAutoGroupBroadcast(sock) {
             const groups = await sock.groupFetchAllParticipating();
             const groupIds = Object.keys(groups);
 
-            if (groupIds.length === 0) {
-                console.log("[AUTO GRUP] Bot belum masuk grup manapun.");
-            } else {
+            if (groupIds.length > 0) {
                 const targetId = groupIds[Math.floor(Math.random() * groupIds.length)];
                 const groupName = groups[targetId].subject;
 
