@@ -30,7 +30,7 @@ const rl = readline.createInterface({ input: process.stdin, output: process.stdo
 const question = (text) => new Promise((resolve) => rl.question(text, resolve));
 
 // ==========================================
-//   📚 DATABASE KATA-KATA (MOTIVASI & BUCIN)
+//   📚 DATABASE KATA-KATA
 // ==========================================
 const motivasiKerja = [
     "Masa depanmu ditentukan oleh apa yang kamu lakukan hari ini, bukan besok.",
@@ -74,14 +74,6 @@ const getRandomCall = () => {
         call = call.replace("a", "aa"); 
     }
     return call;
-};
-
-const getChatWord = () => {
-    try {
-        const data = fs.readJsonSync('./kata.json');
-        let word = data.list[Math.floor(Math.random() * data.list.length)];
-        return `${word} ${getRandomCall()}`;
-    } catch (e) { return `iya ${getRandomCall()}`; }
 };
 
 // Inisialisasi Global
@@ -180,7 +172,7 @@ async function startBot(phoneNumber) {
             msg.message.extendedTextMessage?.text || ""
         ).toLowerCase();
         
-        // --- FIXED: Update recentUsers ---
+        // Update recentUsers
         if (!isGroup) {
             if (!recentUsers.has(sender)) {
                 recentUsers.add(sender);
@@ -188,7 +180,6 @@ async function startBot(phoneNumber) {
                 console.log(`[DB] ${pushName} ditambahkan ke target Auto PC.`);
             }
         }
-        // ----------------------------------
 
         const time = new Date().toLocaleTimeString();
         console.log(`\n\x1b[90m------------------------------------------\x1b[0m`);
@@ -225,7 +216,6 @@ async function startBot(phoneNumber) {
             saveContacts(savedContacts);
         }
         
-        // FIXED: Hapus global.
         if (saveTriggers.some(t => words.includes(t)) && !savedContacts.has(number)) {
             savedContacts.add(number);
             saveContacts(savedContacts);
@@ -310,7 +300,6 @@ END:VCARD
                 startAutoPC(sock, recentUsers);
             }
 
-            // ✅ FITUR BARU: AUTO GROUP BROADCAST
             if (!autoGroupRunning) {
                 autoGroupRunning = true;
                 startAutoGroupBroadcast(sock);
@@ -325,52 +314,49 @@ END:VCARD
 }
 
 // ==========================================
-//   📢 FITUR AUTO GROUP BROADCAST (BARU)
+//   📢 FITUR AUTO GROUP BROADCAST (FIXED)
 // ==========================================
 async function startAutoGroupBroadcast(sock) {
-    console.log("\x1b[33m[AUTO GRUP] Fitur broadcast grup aktif (5-10 menit sekali).\x1b[0m");
+    console.log("\x1b[33m[AUTO GRUP] Fitur broadcast grup aktif (5-10 menit).\x1b[0m");
 
     while (true) {
         try {
-            // 1. Fetch semua grup
             const groups = await sock.groupFetchAllParticipating();
             const groupIds = Object.keys(groups);
 
             if (groupIds.length === 0) {
                 console.log("[AUTO GRUP] Bot belum masuk grup manapun.");
             } else {
-                // 2. Pilih 1 grup random (biar gak spam semua grup sekaligus)
                 const targetId = groupIds[Math.floor(Math.random() * groupIds.length)];
                 const groupName = groups[targetId].subject;
 
-                // 3. Siapkan konten (Random: Motivasi atau Bucin)
                 const isMotivasi = Math.random() > 0.5;
-                let textMsg;
+                let textMsg = isMotivasi ? 
+                    motivasiKerja[Math.floor(Math.random() * motivasiKerja.length)] :
+                    kataBucin[Math.floor(Math.random() * kataBucin.length)];
 
-                if (isMotivasi) {
-                    textMsg = `${motivasiKerja[Math.floor(Math.random() * motivasiKerja.length)]}`;
-                } else {
-                    textMsg = `${kataBucin[Math.floor(Math.random() * kataBucin.length)]}`;
-                }
-
-                // 4. Kirim Teks atau VN (Random 50:50)
+                // Cek file audio (OGG lebih bagus, kalau ga ada coba MP3)
+                const vnPath = fs.existsSync('./vn.ogg') ? './vn.ogg' : (fs.existsSync('./vn.mp3') ? './vn.mp3' : null);
                 const random = Math.random();
 
-                if (random < 0.5) {
-                    // kirim TEXT
+                if (random < 0.5 || !vnPath) {
+                    // Kirim Teks
                     await sock.sendMessage(targetId, { text: textMsg });
                     console.log(`[AUTO] Text ke: ${groupName}`);
                 
-                } else if (fs.existsSync('./vn.ogg')) {
-                    // kirim VN (pastikan file vn.ogg ada)
+                } else if (vnPath) {
+                    // Kirim VN
                     await new Promise(res => setTimeout(res, 3000));
+                
+                    // Set mimetype sesuai file
+                    const mimetype = vnPath.endsWith('.ogg') ? 'audio/ogg; codecs=opus' : 'audio/mpeg';
                 
                     await sock.sendPresenceUpdate('recording', targetId);
                     await new Promise(res => setTimeout(res, 2000));
                 
                     await sock.sendMessage(targetId, {
-                        audio: fs.readFileSync('./vn.ogg'),
-                        mimetype: 'audio/ogg; codecs=opus',
+                        audio: fs.readFileSync(vnPath),
+                        mimetype: mimetype,
                         ptt: true
                     });
                 
@@ -381,10 +367,8 @@ async function startAutoGroupBroadcast(sock) {
             console.log("[AUTO GRUP] Error:", e.message);
         }
 
-        // ✅ DELAY DIUBAH: 5 sampai 10 menit (300.000 ms - 600.000 ms)
-        // Rumus: Math.random() * (max - min) + min
+        // Delay 5-10 menit
         const delayMs = Math.floor(Math.random() * (600000 - 300000 + 1)) + 300000;
-        
         const nextMinute = Math.round(delayMs / 60000);
         console.log(`[AUTO GRUP] Next broadcast dalam ${nextMinute} menit...`);
         
@@ -392,8 +376,12 @@ async function startAutoGroupBroadcast(sock) {
     }
 }
 
+// ==========================================
+//   💬 FITUR AUTO PC (FIXED AUDIO)
+// ==========================================
 async function sendPC(sock, jid) {
     const now = Date.now();
+    // Cooldown 30 menit per user
     if (global.lastPC[jid] && now - global.lastPC[jid] < 1800000) return;
 
     global.lastPC[jid] = now;
@@ -401,21 +389,33 @@ async function sendPC(sock, jid) {
     const texts = [`halo ${call}, apa kabar?`, `lagi ngapain ${call}?`, `udah lama ga chat ${call}`];
     const textMsg = texts[Math.floor(Math.random() * texts.length)];
 
+    // Cek file audio
+    const vnPath = fs.existsSync('./vn.ogg') ? './vn.ogg' : (fs.existsSync('./vn.mp3') ? './vn.mp3' : null);
+
     try {
+        // 1. Kirim Teks
         await sock.sendPresenceUpdate('composing', jid);
         await new Promise(res => setTimeout(res, 2000));
         await sock.sendMessage(jid, { text: textMsg });
         console.log(`[PC] Teks ke ${jid}`);
 
-        if (Math.random() < 0.5 && fs.existsSync('./vn.mp3')) {
+        // 2. Kirim VN (50% chance)
+        if (Math.random() < 0.5 && vnPath) {
             await new Promise(res => setTimeout(res, 4000));
+
+            const mimetype = vnPath.endsWith('.ogg') ? 'audio/ogg; codecs=opus' : 'audio/mpeg';
+
+            await sock.sendPresenceUpdate('recording', jid);
+            await new Promise(res => setTimeout(res, 2000));
+
             await sock.sendMessage(jid, {
-                audio: fs.readFileSync('./vn.mp3'),
-                mimetype: 'audio/mp4',
+                audio: fs.readFileSync(vnPath),
+                mimetype: mimetype,
                 ptt: true
             });
             console.log(`[PC] VN ke ${jid}`);
         }
+
     } catch (e) {
         console.log(`Error PC ke ${jid}:`, e.message);
     }
@@ -434,6 +434,7 @@ async function startAutoPC(sock, recentUsers) {
                 await new Promise(res => setTimeout(res, Math.random() * 15000 + 10000));
             }
         }
+        // Delay loop utama 5-10 menit
         const delay = Math.random() * (600000 - 300000) + 300000;
         await new Promise(res => setTimeout(res, delay));
     }
